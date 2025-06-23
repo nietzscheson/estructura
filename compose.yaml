@@ -1,0 +1,73 @@
+services:
+#  core:
+#    container_name: core
+#    build:
+#      context: ./core
+#      dockerfile: Dockerfile
+#    ports:
+#      - 8000:8000
+#    environment:
+#      PROJECT_NAME: $PROJECT_NAME
+#      DYNAMODB_HOST: $DYNAMODB_HOST
+#      GROQ_API_KEY: $GROQ_API_KEY
+#    depends_on:
+#      - dynamodb
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl --fail http://core:8000/health || exit 1"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
+
+#  my:
+#    container_name: my
+#    build:
+#      context: ./web
+#      dockerfile: Dockerfile
+#    ports:
+#      - 3000:8080
+#    command: ["node", ".next/standalone/packages/my/server.js"]
+    
+  dynamodb:
+    command: "-jar DynamoDBLocal.jar -inMemory -port 8000 &"
+    # command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    container_name: dynamodb
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://dynamodb:8000 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 8123:8000
+    # volumes:
+    #   - "./.dynamodb:/home/dynamodblocal/data"
+    # working_dir: /home/dynamodblocal
+### Use this just locally ###
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb_admin
+    ports:
+      - "8234:8001"
+    environment:
+      DYNAMO_ENDPOINT: "http://dynamodb:8000"
+      AWS_REGION: "us-east-1"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    depends_on:
+      - dynamodb
+  postgres:
+    image: postgres:17.4
+    container_name: postgres
+    ports:
+      - "6543:5432"
+    environment:
+        POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5 
+volumes:
+  cache:
+    driver: local

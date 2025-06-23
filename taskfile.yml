@@ -1,0 +1,165 @@
+version: '3'
+
+#includes:
+#  dev:
+#    taskfile: ./tasks/dev.yml
+tasks:
+  terraform:workspace:select:
+    cmds:
+      - terraform workspace select {{.ENVIRONMENT}}
+    requires:
+      vars: ['ENVIRONMENT']
+    dir: ./infra
+  terraform:init:
+    cmds:
+      - terraform init -reconfigure
+    dir: ./infra
+  terraform:apply:
+    cmds:
+      - task: terraform:init
+      - task: terraform:workspace:select
+        vars:
+          ENVIRONMENT: '{{.ENVIRONMENT}}'
+      - terraform apply -auto-approve
+    dir: ./infra
+    requires:
+      vars: ['ENVIRONMENT']
+    env:
+      ENVIRONMENT: "{{.ENVIRONMENT}}"
+      AWS_DEFAULT_REGION: "{{.AWS_DEFAULT_REGION}}"
+      TF_VAR_aws_default_region: "{{.AWS_DEFAULT_REGION}}"
+  terraform:environment:output:
+    cmds:
+      - export $(terraform output -json | jq -r 'to_entries|map("\(.key | ascii_upcase)=\(.value.value)")|.[]' | xargs)
+    dir: ./infra
+  terraform:workspace:show:
+    cmds:
+      - terraform workspace show
+    dir: ./infra
+  docker:python:build:
+    cmds:
+      - docker build -t $ECR_PYTHON_REPOSITORY_NAME . --target runtime
+    dir: ./core
+  docker:python:tag:
+    deps:
+      - docker:python:build
+    cmds:
+      - docker tag $ECR_PYTHON_REPOSITORY_NAME:latest $ECR_PYTHON_REPOSITORY_URL:latest
+  docker:python:push:
+    deps:
+      - docker:python:tag
+    cmds:
+      - docker push $ECR_PYTHON_REPOSITORY_URL:latest
+  lambda:update:
+    cmds:
+      - |
+        aws lambda update-function-code --function-name $API_FUNCTION_NAME --image-uri $ECR_PYTHON_REPOSITORY_URL:latest > /dev/null && echo "$API_FUNCTION_NAME updated" &
+        aws lambda update-function-code --function-name $DOCUMENT_PROCESSING_FUNCTION_NAME --image-uri $ECR_PYTHON_REPOSITORY_URL:latest > /dev/null && echo "$DOCUMENT_PROCESSING_FUNCTION_NAME updated" &
+        aws lambda update-function-code --function-name $COGNITO_PRE_SIGN_UP_FUNCTION_NAME --image-uri $ECR_PYTHON_REPOSITORY_URL:latest > /dev/null && echo "$COGNITO_PRE_SIGN_UP_FUNCTION_NAME updated" &
+        aws lambda update-function-code --function-name $COGNITO_POST_CONFIRMATION_FUNCTION_NAME --image-uri $ECR_PYTHON_REPOSITORY_URL:latest > /dev/null && echo "$COGNITO_POST_CONFIRMATION_FUNCTION_NAME updated" &
+        wait
+  api-gateway:deploy:
+    cmds:
+      - |
+        aws apigatewayv2 create-deployment --api-id $INTERNAL_GATEWAY_ID --stage-name $ENVIRONMENT &
+        wait
+  my:build:
+    cmds:
+      - rm -rf packages/www/dist
+      - rm -rf .nx && rm -rf packages/my/.next
+      - rm -rf .nx && rm -rf packages/www/dist
+      - lerna run build --stream --parallel
+      - 
+      #- npx nx build my --skip-nx-cache
+    dir: ./web
+  s3:deploy:
+    cmds:
+      - lerna run deploy
+    dir: ./web
+  deploy:
+    cmds:
+      - |
+        export ENVIRONMENT={{.ENVIRONMENT}} 
+        export AWS_DEFAULT_REGION={{.AWS_DEFAULT_REGION}} 
+        export TF_VAR_aws_default_region={{.AWS_DEFAULT_REGION}}
+
+        echo ENVIRONMENT: $ENVIRONMENT
+        echo AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+        echo TF_VAR_aws_default_region: $TF_VAR_aws_default_region
+        
+        task terraform:apply
+        source ./secrets.sh
+
+        task my:build
+        task docker:python:push
+        wait
+        task lambda:update
+        task api-gateway:deploy
+        task s3:deploy
+    dir: ./tasks
+    vars:
+      ENVIRONMENT: default
+      AWS_DEFAULT_REGION: us-east-1
+      TF_VAR_aws_default_region: $AWS_DEFAULT_REGION    
+  deploy:dev:
+    cmds:
+      - task: deploy
+        vars:
+          ENVIRONMENT: dev
+          AWS_DEFAULT_REGION: us-east-2
+          TF_VAR_aws_default_region: $AWS_DEFAULT_REGION
+
+  terraform:dev:apply:
+    cmds:
+      - task: terraform:apply
+        vars:
+          ENVIRONMENT: dev
+          AWS_DEFAULT_REGION: us-east-2
+          TF_VAR_aws_default_region: $AWS_DEFAULT_REGION
+
+  deploy:prod:
+    cmds:
+      - task: deploy
+        vars:
+          ENVIRONMENT: prod
+          AWS_DEFAULT_REGION: us-east-1
+          TF_VAR_aws_default_region: $AWS_DEFAULT_REGION
+
+  destroy:
+    cmds:
+      - |
+        export ENVIRONMENT={{.ENVIRONMENT}}
+        export AWS_DEFAULT_REGION={{.AWS_DEFAULT_REGION}}
+        export TF_VAR_aws_default_region={{.AWS_DEFAULT_REGION}}
+        task terraform:workspace:select
+        terraform destroy -auto-approve
+    dir: ./infra
+#  destroy:dev:
+#    cmds:
+#      - task: destroy
+#        vars:
+#          ENVIRONMENT: dev
+#          AWS_DEFAULT_REGION: us-east-2
+#          TF_VAR_aws_default_region: $AWS_DEFAULT_REGION
+#  destroy:prod:
+#    cmds:
+#      - task: destroy
+#        vars:
+#          ENVIRONMENT: prod
+#          AWS_DEFAULT_REGION: us-east-1
+#          TF_VAR_aws_default_region: $AWS_DEFAULT_REGION
+
+  test:
+    cmds:
+      - poetry run pytest -x
+    dir: ./core
+  dependencies:
+    cmds:
+      - poetry install --no-root
+    dir: ./core
+  docker.up:
+    dir: "{{.USER_WORKING_DIR}}"
+    preconditions:
+      - test -f compose.yaml
+    cmds:
+      - docker compose up -d

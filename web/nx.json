@@ -1,0 +1,28 @@
+{
+  "targetDefaults": {
+    "dev": {
+      "cache": true,
+      "dependsOn": [
+        "^dev"
+      ]
+    },
+    "build": {
+      "cache": true,
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "start": {
+      "cache": true,
+      "dependsOn": [
+        "^start"
+      ]
+    },
+    "lint": {
+      "cache": true,
+      "dependsOn": [
+        "^lint"
+      ]
+    }
+  }
+}

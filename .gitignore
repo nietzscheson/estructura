@@ -1,0 +1,14 @@
+__pycache__
+.DS_Store
+.env
+env*
+!env.py
+.terraform
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+.venv
+.pytest_cache
+.ruff_cache
+**/node_modules/
+**/.nx/

@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "structfy"
+version = "0.1.0"
+description = "structfy Project"
+authors = ["Cristian Angulo <cristianangulonova@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.115.12"
+uvicorn = "0.34.0"
+pydantic = "2.10.4"
+pydantic-settings = "2.7.1"
+pynamodb = "6.0.1"
+httpx = "0.28.1"
+dependency-injector = "4.44.0"
+transitions = "0.9.2"
+boto3 = "1.35.92"
+python-ulid = "3.0.0"
+python-multipart = "^0.0.20"
+anthropic = {extras = ["bedrock"], version = "^0.42.0"}
+langchain-aws = "^0.2.11"
+langchain = "^0.3.15"
+langchain-community = "^0.3.15"
+tiktoken = "^0.8.0"
+langchain-groq = "^0.2.4"
+sqlalchemy = "^2.0.40"
+alembic = "^1.15.2"
+psycopg2-binary = "^2.9.10"
+sqlmodel = "^0.0.24"
+pypdf = "^5.4.0"
+sqlalchemy-state-machine = "^1.11.0"
+pdf2image = "^1.17.0"
+stripe = "^12.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "8.3.4"
+ruff = "0.8.6"
+black = "24.10.0"
+isort = "5.13.2"
+pytest-asyncio = "0.25.1"
+factory-boy = "3.3.1"
+pytest-httpx = "0.35.0"
+debugpy = "1.8.11"
+moto = "^5.0.27"
+faker = "^37.1.0"
+pycln = "^2.5.0"
+deepmerge = "^2.0"
+
+[tool.pytest.ini_options]
+addopts = "-s"
+asyncio_mode = "auto"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
